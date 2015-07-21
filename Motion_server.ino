@@ -20,7 +20,10 @@ EthernetServer server(80);
 //Vars
 boolean Armed = false; // Etat de la protection : 0 Désactivée / 1 Activée;
 boolean Silenced = false;
-boolean Fired = false;
+boolean FiredSalon = false;
+boolean FiredGarage = false;
+boolean TriggerSalon = false;
+boolean TriggerGarage = false;
 byte RelayArmState = 0;
 byte RelayDisarmState = 0;
 unsigned long Fired_at = 0;
@@ -87,24 +90,27 @@ void loop() {
   
   if (Armed) // Si la protection est activée
   { 
-    if(Fired) // L'alarme a déjà été déclenchée
+    if(FiredSalon || FiredGarage) // L'alarme a déjà été déclenchée
     {
       if ((millis() - Fired_at) > AlarmDuration) // Coupe l'alarme apres 15 minutes
       {
         Serial.println(F("Timeout alarme stoppee!"));
         Alarm(LOW);
-        Fired = false;
+        FiredSalon = false;
+        FiredGarage = false;
       }
     }
-    if(digitalRead(INmsSalon) || digitalRead(INmsGarage)) // Intrusion détéctée
+    TriggerSalon = digitalRead(INmsSalon);
+    TriggerGarage = digitalRead(INmsGarage);
+    if(TriggerSalon || TriggerGarage) // Intrusion détéctée
     {
-      if(!Fired) // Nouvelle Alarme
+      if(!FiredSalon && !FiredGarage) // Nouvelle Alarme
       {
         Serial.println(F("Intrusion detectee, declenchement alarme !"));
         Alarm(HIGH);
         Fired_at = millis();
-        Fired = true;
-        // Envois alerte serveur web
+        FiredSalon = TriggerSalon;
+        FiredGarage = TriggerGarage;
      }
     }
   }  
@@ -138,24 +144,38 @@ void loop() {
             {
                 if(Silenced)
                 {
-                  if(Fired)
+                  if(FiredSalon)
                   {
-                    client.println(F("4"));
+                    client.println(F("5"));
                   }
                   else
                   {
-                    client.println(F("3"));
+                    if(FiredGarage)
+                    {
+                      client.println(F("6"));
+                    }
+                    else
+                    {
+                      client.println(F("4"));
+                    }
                   }
                 }
                 else
                 {
-                  if(Fired)
+                  if(FiredSalon)
                   {
                     client.println(F("2"));
                   }
                   else
                   {
-                    client.println(F("1"));
+                    if(FiredGarage)
+                    {
+                      client.println(F("3"));
+                    }
+                    else
+                    {
+                      client.println(F("1"));
+                    }
                   }
                 }
             }
@@ -216,7 +236,8 @@ void Disarm()
   beep();
   beep();  
   Armed = false;
-  Fired = false;
+  FiredSalon = false;
+  FiredGarage = false;
   Silenced = false;
   Serial.println(F("Systeme desarme"));
 }
